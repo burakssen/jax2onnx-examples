@@ -2,8 +2,7 @@ import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 from jaxfluids import InputManager, InitializationManager, SimulationManager
-from jaxfluids.solvers.space_solver import SpaceSolver
-from jaxfluids.solvers.positivity.positivity_handler import PositivityHandler
+from jaxfluids.data_types.ml_buffers import MachineLearningSetup, ParametersSetup, CallablesSetup
 import jax.numpy as jnp
 from jax2onnx import to_onnx
 
@@ -14,48 +13,30 @@ sim_manager = SimulationManager(input_manager)
 
 jxf_buffers = initialization_manager.initialization()
 
-domain_information = input_manager.domain_information
-material_manager = input_manager.material_manager
-equation_manager = input_manager.equation_manager
-halo_manager = input_manager.halo_manager
-numerical_setup = input_manager.numerical_setup
-gravity = input_manager.case_setup.forcing_setup.gravity
-geometric_source = input_manager.case_setup.forcing_setup.geometric_source
-
-positivity_handler = PositivityHandler(
-            domain_information=domain_information,
-            material_manager=material_manager,
-            equation_manager=equation_manager,
-            halo_manager=halo_manager,
-            numerical_setup=numerical_setup,
-            levelset_handler=None,
-            diffuse_interface_handler=None,
-        )
-
-space_solver = SpaceSolver(
-            domain_information=domain_information,
-            material_manager=material_manager,
-            equation_manager=equation_manager,
-            halo_manager=halo_manager,
-            numerical_setup=numerical_setup,
-            gravity=gravity,
-            geometric_source=geometric_source,
-            levelset_handler=None,
-            diffuse_interface_handler=None,
-            positivity_handler=positivity_handler)
+ml_setup = MachineLearningSetup(
+    CallablesSetup(),
+    ParametersSetup()
+)
 
 def compute_rhs_fn():
-    return space_solver.compute_rhs(
-        initialization_manager.material_manager.equation_information.conservatives_slices,
+    return sim_manager.space_solver.compute_rhs(
+        jxf_buffers.simulation_buffers.material_fields.conservatives,
         jxf_buffers.simulation_buffers.material_fields.primitives,
-        initialization_manager.material_manager.get_temperature(
-            primitives=jxf_buffers.simulation_buffers.material_fields.primitives,
-        ),
-        0.0,
-        0.01)
+        jxf_buffers.simulation_buffers.material_fields.temperature,
+        jxf_buffers.time_control_variables.physical_simulation_time,
+        jxf_buffers.time_control_variables.physical_timestep_size,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        ml_setup,
+        False
+    )
     
-
-
 model = to_onnx(
     compute_rhs_fn,
     inputs=[],
