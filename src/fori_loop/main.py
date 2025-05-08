@@ -1,6 +1,7 @@
 import jax
 import jax.numpy as jnp
 from jax2onnx import to_onnx
+import os
 
 def model_fn(x):
     steps = 5
@@ -21,3 +22,8 @@ dummy_input = jnp.ones((2,), dtype=jnp.float32)
 print(model_fn(dummy_input))
 
 onnx_model = to_onnx(model_fn, inputs=[dummy_input])
+
+os.makedirs("../../onnxfiles/fori_loop", exist_ok=True)
+
+with open("../../onnxfiles/fori_loop/fori_loop.onnx", "wb") as f:
+    f.write(onnx_model.SerializeToString())
